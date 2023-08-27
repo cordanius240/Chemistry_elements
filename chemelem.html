@@ -1,0 +1,201 @@
+<html>
+
+<head>
+    <script src="https://3Dmol.org/build/3Dmol-min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.js"></script>
+    <script src="https://yandex.st/jquery/2.1.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <style>
+        .mol-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            flex: 10;
+            border-left: 1px solid#858585;
+        }
+
+        .parent {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+        }
+
+        .list {
+            flex: 3;
+            max-height: 100%;
+            overflow-y: auto;
+        }
+
+        .listmember {
+            border: 1px solid#858585;
+            width: 98%;
+            font-size: 200%;
+            display: flex;
+            justify-content: center;
+            align-items: center
+        }
+
+        header {
+            font-size: 27px;
+            border-bottom: 1px solid#858585;
+            padding-top: 0px;
+            margin-top: 0px;
+        }
+
+        body,
+        html {
+            padding-top: 0px;
+            margin-top: 0px;
+        }
+    </style>
+</head>
+
+<body>
+    <header>Для просмотра выберете нужный элемент в cписке в левой части странички</header>
+    <div class="parent" id="parentcontainer">
+        <div class="list" id="listcontainer">
+        </div>
+        <div id="container-01" class="mol-container"></div>
+    </div>
+    <script>
+        const coordinatsofsfer = new Map();
+        let element_div = document.querySelector('#container-01');
+        let config = { backgroundColor: 'white' };
+        let viewer = $3Dmol.createViewer(element_div, config);
+        var initialCameraPosition = viewer.getView();
+        var parent_div = document.getElementById("parentcontainer");
+        var list_div = document.getElementById("listcontainer");
+        var substance = "ethanol";
+        function substancereqvest() {
+            return new Promise(function (resolve, reject) {
+                $.ajax({
+                    url: "ajax/ajaxsubstance.php",
+                    type: "POST",
+                    dataType: 'json',
+                    success: function (data) {
+                        for (let i = 0; i < data.length; i = i + 3) {
+                            var div_for_append = document.createElement('div')
+                            div_for_append.className = "listmember";
+                            div_for_append.id = `${data[i]}`;
+                            if (data[i + 1] == '1') {
+                                div_for_append.innerHTML = `<p>${data[i]} CH<sub>${data[i + 2]}</sub></p>`;
+                            } else {
+                                div_for_append.innerHTML = `<p>${data[i]} C<sub>${data[i + 1]}</sub>H<sub>${data[i + 2]}</sub></p>`;
+                            }
+                            list_div.appendChild(div_for_append);
+                        }
+                        var elements = document.querySelectorAll(".listmember");
+                        elements.forEach(function (element) {
+                            element.addEventListener("click", function () {
+                                substance = element.id;
+                                Elementsrendering();
+                            });
+                        });
+                    }
+
+                });
+                resolve();
+            });
+        }
+        substancereqvest().then(function () {
+            var elements = document.querySelectorAll(".listmember");
+        });
+        function Connectionsrendering() {
+            viewer.setView(initialCameraPosition);
+
+            viewer.clear();
+            $.ajax({
+                url: "ajax/ajaxconn.php",
+                type: "POST",
+                data: { 'substance': substance },
+                dataType: 'json',
+                success: function (data) {
+                    for (let i = 0; i < data.length; i = i + 2) {
+                        if (coordinatsofsfer.has(data[i]) && coordinatsofsfer.has(data[i + 1])) {
+                            let x1 = coordinatsofsfer.get(data[i]).get("X");
+                            let y1 = coordinatsofsfer.get(data[i]).get("Y");
+                            let z1 = coordinatsofsfer.get(data[i]).get("Z");
+                            let x2 = coordinatsofsfer.get(data[i + 1]).get("X");
+                            let y2 = coordinatsofsfer.get(data[i + 1]).get("Y");
+                            let z2 = coordinatsofsfer.get(data[i + 1]).get("Z");
+                            viewer.addCylinder({
+                                start: { x: x1, y: y1, z: z1 },
+                                end: { x: x2, y: y2, z: z2 },
+                                radius: 1.0,
+                                color: 'red'
+                            });
+                        }
+
+                    }
+                }
+            });
+        }
+        function Elementsrendering() {
+            viewer.setView(initialCameraPosition);
+
+            viewer.clear();
+            $.ajax({
+                url: "ajax/ajaxelement.php",
+                type: "POST",
+                data: { 'substance': substance },
+                dataType: 'json',
+                success: function (data) {
+                    for (let i = 0; i < data.length; i = i + 5) {
+                        if (data[i + 1] == "Carbon    ") {
+                            viewer.addSphere({ center: { x: data[i + 2], y: data[i + 3], z: data[i + 4] }, radius: 5.0, color: 'black' });
+                            const buffer = new Map();
+                            buffer.set("X", data[i + 2]);
+                            buffer.set("Y", data[i + 3]);
+                            buffer.set("Z", data[i + 4]);
+                            coordinatsofsfer.set(data[i], buffer);
+                        } else if (data[i + 1] == "Hydrogen  ") {
+                            viewer.addSphere({ center: { x: data[i + 2], y: data[i + 3], z: data[i + 4] }, radius: 2.5, color: 'white' });
+                            const buffer = new Map();
+                            buffer.set("X", data[i + 2]);
+                            buffer.set("Y", data[i + 3]);
+                            buffer.set("Z", data[i + 4]);
+                            coordinatsofsfer.set(data[i], buffer);
+                        }
+
+                    }
+                    $.ajax({
+                        url: "ajax/ajaxconn.php",
+                        type: "POST",
+                        data: { 'substance': substance },
+                        dataType: 'json',
+                        success: function (data) {
+                            for (let i = 0; i < data.length; i = i + 2) {
+                                if (coordinatsofsfer.has(data[i]) && coordinatsofsfer.has(data[i + 1])) {
+                                    var x1 = coordinatsofsfer.get(data[i]).get("X");
+                                    var y1 = coordinatsofsfer.get(data[i]).get("Y");
+                                    var z1 = coordinatsofsfer.get(data[i]).get("Z");
+                                    var x2 = coordinatsofsfer.get(data[i + 1]).get("X");
+                                    var y2 = coordinatsofsfer.get(data[i + 1]).get("Y");
+                                    var z2 = coordinatsofsfer.get(data[i + 1]).get("Z");
+                                    viewer.addCylinder({
+                                        start: { x: x1, y: y1, z: z1 },
+                                        end: { x: x2, y: y2, z: z2 },
+                                        radius: 1.0,
+                                        color: 'grey'
+                                    });
+                                }
+
+                            }
+                            viewer.zoomTo();
+                            viewer.render();
+                            viewer.zoom(0.8, 2000);
+                        }
+                    });
+                }
+            });
+        }
+    </script>
+
+</body>
+
+
+
+
+</html>
